@@ -24,37 +24,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Serving a directory of registered services. *)
-
-module type LOGGING = sig
-  val debug : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-  val log_info : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-  val log_notice : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-  val warn : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-  val log_error : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-  val lwt_debug : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-
-  val lwt_log_info : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-
-  val lwt_log_notice : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-
-  val lwt_warn : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-
-  val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-end
-
-module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
+module Make
+    (Encoding : Resto.ENCODING)
+    (Io : Resto.IO)
+    (Log : Resto.LOGGING with type +'a io = 'a Io.t) : sig
   module Media_type : module type of struct
     include Media_type.Make (Encoding)
   end
 
   module Directory : module type of struct
-    include Resto_directory.Make (Encoding) (Resto_lwt.Io)
+    include Resto_directory.Make (Encoding) (Io)
   end
 
   (** A handle on the server worker. *)
@@ -67,27 +46,30 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
     ?agent:string ->
     ?acl:Acl.t ->
     media_types:Media_type.t list ->
-    Conduit_lwt_unix.server ->
+    Io.Server.server ->
     unit Directory.t ->
-    server Lwt.t
+    server Io.t
 
   (* configure the access list for this server *)
   val set_acl : server -> Acl.t -> unit
 
   (** Kill an RPC server. *)
-  val shutdown : server -> unit Lwt.t
+  val shutdown : server -> unit Io.t
 end
 
 (** [Make_selfserver] is a functor that produces only the machinery necessary
     for local use. Specifically, it produces the values and types needed for the
     [Self_serving_client]. *)
-module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
+module Make_selfserver
+    (Encoding : Resto.ENCODING)
+    (Io : Resto.IO)
+    (Log : Resto.LOGGING with type +'a io = 'a Io.t) : sig
   module Media_type : module type of struct
     include Media_type.Make (Encoding)
   end
 
   module Directory : module type of struct
-    include Resto_directory.Make (Encoding) (Resto_lwt.Io)
+    include Resto_directory.Make (Encoding) (Io)
   end
 
   module Media : sig
@@ -106,7 +88,7 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
     val output_content_media_type :
       ?headers:Cohttp.Header.t ->
       medias ->
-      (string * Media_type.t, [> `Not_acceptable]) Result.result
+      (string * Media_type.t, [> `Not_acceptable]) result
   end
 
   module Agent : sig
@@ -116,7 +98,7 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
   module Handlers : sig
     val invalid_cors : Resto_cohttp.Cors.t -> Cohttp.Header.t -> bool
 
-    val invalid_cors_response : string -> Cohttp.Response.t * Cohttp_lwt.Body.t
+    val invalid_cors_response : string -> Cohttp.Response.t * Io.Body.body
 
     val handle_error :
       Cohttp.Header.t ->
@@ -129,7 +111,7 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
       | `Not_found
       | `Not_implemented
       | `Unsupported_media_type of 'a ] ->
-      Cohttp.Response.t * Cohttp_lwt.Body.t
+      Cohttp.Response.t * Io.Body.body
 
     val handle_rpc_answer :
       string ->
@@ -137,36 +119,32 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
                Cohttp.Header.t ->
       ('o -> string) ->
       [< `Created of string option | `No_content | `Ok of 'o] ->
-      Cohttp_lwt_unix.Response.t * Cohttp_lwt.Body.t
+      Cohttp.Response.t * Io.Body.body
 
     val handle_rpc_answer_error :
       string ->
       ?headers:(* connection identifier for logging *)
                Cohttp.Header.t ->
-      ('e -> Cohttp_lwt.Body.t * Cohttp.Transfer.encoding) ->
+      ('e -> Io.Body.body * Cohttp.Transfer.encoding) ->
       [< `Conflict of 'e
       | `Error of 'e
       | `Forbidden of 'e
       | `Gone of 'e
       | `Not_found of 'e
       | `Unauthorized of 'e ] ->
-      Cohttp_lwt_unix.Response.t * Cohttp_lwt.Body.t
+      Cohttp.Response.t * Io.Body.body
 
     val handle_rpc_answer_chunk :
       ?headers:Cohttp.Header.t ->
       ('o -> (bytes * int * int) Seq.t) ->
       [< `OkChunk of 'o] ->
-      Cohttp_lwt_unix.Response.t
-      * ('d Lwt_io.channel -> Lwt_io.output_channel -> unit Lwt.t)
+      Cohttp.Response.t * ('d Io.channel -> Io.output_channel -> unit Io.t)
 
     val handle_options :
       unit Directory.t ->
       Resto_cohttp.Cors.t ->
       Cohttp.Header.t ->
       string list ->
-      ( Cohttp.Response.t * Cohttp_lwt.Body.t,
-        [> Directory.lookup_error] )
-      Result.result
-      Lwt.t
+      (Cohttp.Response.t * Io.Body.body, [> Directory.lookup_error]) result Io.t
   end
 end

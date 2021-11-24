@@ -25,8 +25,7 @@
 
 open Resto
 open Lwt.Infix
-open Resto_directory
-module Directory = Resto_directory.Make (Resto_json.Encoding)
+module Directory = Resto_directory.Make (Resto_json.Encoding) (Resto_lwt.Io)
 open Directory
 module Answer = Answer
 

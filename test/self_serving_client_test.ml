@@ -54,7 +54,7 @@ module Self_serving_client =
     (Encoding)
     (NullLogger)
 
-include Resto_directory.Make (Encoding)
+include Resto_directory.Make (Encoding) (Resto_lwt.Io)
 module Service = MakeService (Resto_json.Encoding)
 open Service
 

@@ -25,7 +25,6 @@
 
 open Services
 open Directory
-open Resto_directory
 open Lwt.Infix
 
 let () =

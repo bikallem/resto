@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+include module type of Resto_intf
+
 module Utils : sig
   val split_path : string -> string list
 

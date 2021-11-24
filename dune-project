@@ -1,3 +1,2 @@
-(lang dune 1.11)
+(lang dune 2.9)
 (name resto)
-(using fmt 1.1)

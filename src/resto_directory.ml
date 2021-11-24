@@ -28,34 +28,34 @@ open Resto
 
 let map_option f = function None -> None | Some x -> Some (f x)
 
-let ( >>= ) = Lwt.bind
-
-let ( >|= ) = Lwt.( >|= )
-
-module Answer = struct
-  (** Return type for service handler *)
-  type ('o, 'e) t =
-    [ `Ok of 'o (* 200 *)
-    | `OkChunk of 'o (* 200 *)
-    | `OkStream of 'o stream (* 200 *)
-    | `Created of string option (* 201 *)
-    | `No_content (* 204 *)
-    | `Unauthorized of 'e option (* 401 *)
-    | `Forbidden of 'e option (* 403 *)
-    | `Not_found of 'e option (* 404 *)
-    | `Conflict of 'e option (* 409 *)
-    | `Gone of 'e option (* 410 *)
-    | `Error of 'e option (* 500 *) ]
-
-  and 'a stream = {next: unit -> 'a option Lwt.t; shutdown: unit -> unit}
-
-  let return x = Lwt.return (`Ok x)
-
-  let return_stream x = Lwt.return (`OkStream x)
-end
-
-module Make (Encoding : ENCODING) = struct
+module Make (Encoding : ENCODING) (Io : IO) = struct
   module Service = Resto.MakeService (Encoding)
+
+  let ( >>= ) = Io.bind
+
+  let ( >|= ) = Io.map
+
+  module Answer = struct
+    (** Return type for service handler *)
+    type ('o, 'e) t =
+      [ `Ok of 'o (* 200 *)
+      | `OkChunk of 'o (* 200 *)
+      | `OkStream of 'o stream (* 200 *)
+      | `Created of string option (* 201 *)
+      | `No_content (* 204 *)
+      | `Unauthorized of 'e option (* 401 *)
+      | `Forbidden of 'e option (* 403 *)
+      | `Not_found of 'e option (* 404 *)
+      | `Conflict of 'e option (* 409 *)
+      | `Gone of 'e option (* 410 *)
+      | `Error of 'e option (* 500 *) ]
+
+    and 'a stream = {next: unit -> 'a option Io.t; shutdown: unit -> unit}
+
+    let return x = Io.return (`Ok x)
+
+    let return_stream x = Io.return (`OkStream x)
+  end
 
   module Curry = struct
     type (_, _, _, _, _, _) conv =
@@ -115,7 +115,7 @@ module Make (Encoding : ENCODING) = struct
   type 'key t =
     | Empty : 'key t
     | Static : 'key static_directory -> 'key t
-    | Dynamic : string option * ('key -> 'key directory Lwt.t) -> 'key t
+    | Dynamic : string option * ('key -> 'key directory Io.t) -> 'key t
     | DynamicTail : 'a arg * ('key * 'a list) t -> 'key t
 
   and 'key directory = 'key t
@@ -134,19 +134,19 @@ module Make (Encoding : ENCODING) = struct
   and registered_service =
     | Service : {
         types: ('q, 'i, 'o, 'e) types;
-        handler: 'q -> 'i -> ('o, 'e) Answer.t Lwt.t;
+        handler: 'q -> 'i -> ('o, 'e) Answer.t Io.t;
       }
         -> registered_service
 
   and 'key registered_service_builder = {
     meth: Resto.meth;
     description: Encoding.schema Description.service;
-    builder: 'key -> registered_service Lwt.t;
+    builder: 'key -> registered_service Io.t;
   }
 
   let empty = Empty
 
-  let rec map_directory : type a b. (a -> b Lwt.t) -> b directory -> a directory
+  let rec map_directory : type a b. (a -> b Io.t) -> b directory -> a directory
       =
    fun f t ->
     match t with
@@ -160,7 +160,7 @@ module Make (Encoding : ENCODING) = struct
     | Static dir -> Static (map_static_directory f dir)
 
   and map_static_directory :
-      type a b. (a -> b Lwt.t) -> b static_directory -> a static_directory =
+      type a b. (a -> b Io.t) -> b static_directory -> a static_directory =
    fun f t ->
     {
       services = MethMap.map (map_registered_service f) t.services;
@@ -169,7 +169,7 @@ module Make (Encoding : ENCODING) = struct
 
   and map_static_subdirectories :
       type a b.
-      (a -> b Lwt.t) -> b static_subdirectories -> a static_subdirectories =
+      (a -> b Io.t) -> b static_subdirectories -> a static_subdirectories =
    fun f t ->
     match t with
     | Suffixes map -> Suffixes (StringMap.map (map_directory f) map)
@@ -179,7 +179,7 @@ module Make (Encoding : ENCODING) = struct
 
   and map_registered_service :
       type a b.
-      (a -> b Lwt.t) ->
+      (a -> b Io.t) ->
       b registered_service_builder ->
       a registered_service_builder =
    fun f rs -> {rs with builder = (fun p -> f p >>= fun p -> rs.builder p)}
@@ -272,43 +272,43 @@ module Make (Encoding : ENCODING) = struct
       recurse:bool ->
       ?arg:a ->
       a directory ->
-      Encoding.schema Description.directory Lwt.t =
+      Encoding.schema Description.directory Io.t =
    fun ~recurse ?arg dir ->
     match dir with
-    | Empty -> Lwt.return Description.Empty
+    | Empty -> Io.return Description.Empty
     | Dynamic (descr, builder) -> (
         match arg with
         | None ->
-            Lwt.return (Dynamic descr : Encoding.schema Description.directory)
+            Io.return (Dynamic descr : Encoding.schema Description.directory)
         | Some arg -> builder arg >>= fun dir -> describe_directory ~recurse dir
         )
     | DynamicTail (_, dir) -> describe_directory ~recurse dir
     | Static dir ->
         describe_static_directory recurse dir >>= fun dir ->
-        Lwt.return (Static dir : Encoding.schema Description.directory)
+        Io.return (Static dir : Encoding.schema Description.directory)
 
   and describe_static_directory :
       type a.
       bool ->
       a static_directory ->
-      Encoding.schema Description.static_directory Lwt.t =
+      Encoding.schema Description.static_directory Io.t =
    fun recurse dir ->
     let services = MethMap.map describe_service dir.services in
     ( if recurse then
       match dir.subdirs with
-      | None -> Lwt.return_none
+      | None -> Io.return_none
       | Some subdirs ->
           describe_static_subdirectories subdirs >>= fun dirs ->
-          Lwt.return (Some dirs)
-    else Lwt.return_none )
+          Io.return (Some dirs)
+    else Io.return_none )
     >>= fun subdirs ->
-    Lwt.return
+    Io.return
       ({services; subdirs} : Encoding.schema Description.static_directory)
 
   and describe_static_subdirectories :
       type a.
       a static_subdirectories ->
-      Encoding.schema Description.static_subdirectories Lwt.t =
+      Encoding.schema Description.static_subdirectories Io.t =
    fun dir ->
     match dir with
     | Suffixes map ->
@@ -316,15 +316,15 @@ module Make (Encoding : ENCODING) = struct
           (fun key dir map ->
             map >>= fun map ->
             describe_directory ~recurse:true dir >>= fun dir ->
-            Lwt.return (StringMap.add key dir map))
+            Io.return (StringMap.add key dir map))
           map
-          (Lwt.return StringMap.empty)
+          (Io.return StringMap.empty)
         >>= fun map ->
-        Lwt.return
+        Io.return
           (Suffixes map : Encoding.schema Description.static_subdirectories)
     | Arg (arg, dir) ->
         describe_directory ~recurse:true dir >>= fun dir ->
-        Lwt.return
+        Io.return
           ( Arg (arg.descr, dir)
             : Encoding.schema Description.static_subdirectories )
 
@@ -361,10 +361,10 @@ module Make (Encoding : ENCODING) = struct
       a directory ->
       a ->
       string list ->
-      (resolved_directory, _) result Lwt.t =
+      (resolved_directory, _) result Io.t =
    fun prefix dir args path ->
     match (path, dir) with
-    | (_, Empty) -> Lwt.return_error `Not_found
+    | (_, Empty) -> Io.return_error `Not_found
     | (path, Dynamic (_, builder)) ->
         builder args >>= fun dir -> resolve prefix dir args path
     | (path, DynamicTail (arg, dir)) -> (
@@ -384,19 +384,18 @@ module Make (Encoding : ENCODING) = struct
             (Ok (prefix, []))
         with
         | Ok (prefix, path) -> resolve prefix dir (args, path) []
-        | Error _ as err -> Lwt.return err )
-    | ([], Static sdir) -> Lwt.return_ok (Dir (sdir, args))
-    | (_name :: _path, Static {subdirs = None; _}) ->
-        Lwt.return_error `Not_found
+        | Error _ as err -> Io.return err )
+    | ([], Static sdir) -> Io.return_ok (Dir (sdir, args))
+    | (_name :: _path, Static {subdirs = None; _}) -> Io.return_error `Not_found
     | (name :: path, Static {subdirs = Some (Suffixes static); _}) -> (
         match StringMap.find name static with
-        | exception Not_found -> Lwt.return_error `Not_found
+        | exception Not_found -> Io.return_error `Not_found
         | dir -> resolve (name :: prefix) dir args path )
     | (name :: path, Static {subdirs = Some (Arg (arg, dir)); _}) -> (
         match arg.destruct name with
         | Ok x -> resolve (name :: prefix) dir (args, x) path
         | Error msg ->
-            Lwt.return_error
+            Io.return_error
             @@ `Cannot_parse_path (List.rev (name :: prefix), arg.descr, msg) )
 
   let lookup :
@@ -405,92 +404,92 @@ module Make (Encoding : ENCODING) = struct
       a ->
       meth ->
       string list ->
-      (registered_service, lookup_error) result Lwt.t =
+      (registered_service, lookup_error) result Io.t =
    fun dir args meth path ->
     resolve [] dir args path >>= function
-    | Error _ as err -> Lwt.return err
+    | Error _ as err -> Io.return err
     | Ok (Dir (dir, args)) -> (
         match MethMap.find meth dir.services with
         | exception Not_found -> (
             match MethMap.bindings dir.services with
-            | [] -> Lwt.return_error `Not_found
-            | l -> Lwt.return_error (`Method_not_allowed (List.map fst l)) )
-        | rs -> rs.builder args >>= Lwt.return_ok )
+            | [] -> Io.return_error `Not_found
+            | l -> Io.return_error (`Method_not_allowed (List.map fst l)) )
+        | rs -> rs.builder args >>= Io.return_ok )
 
   let lookup =
     ( lookup
-      : _ -> _ -> _ -> _ -> (_, lookup_error) result Lwt.t
-      :> _ -> _ -> _ -> _ -> (_, [> lookup_error]) result Lwt.t )
+      : _ -> _ -> _ -> _ -> (_, lookup_error) result Io.t
+      :> _ -> _ -> _ -> _ -> (_, [> lookup_error]) result Io.t )
 
   let allowed_methods :
       type a.
       a directory ->
       a ->
       string list ->
-      (Resto.meth list, lookup_error) result Lwt.t =
+      (Resto.meth list, lookup_error) result Io.t =
    fun dir args path ->
     resolve [] dir args path >>= function
-    | Error err -> Lwt.return_error err
+    | Error err -> Io.return_error err
     | Ok (Dir (dir, _)) -> (
         match MethMap.bindings dir.services with
-        | [] -> Lwt.return_error `Not_found
-        | l -> Lwt.return_ok (List.map fst l) )
+        | [] -> Io.return_error `Not_found
+        | l -> Io.return_ok (List.map fst l) )
 
   let allowed_methods =
     ( allowed_methods
-      : _ -> _ -> _ -> (_, lookup_error) result Lwt.t
-      :> _ -> _ -> _ -> (_, [> lookup_error]) result Lwt.t )
+      : _ -> _ -> _ -> (_, lookup_error) result Io.t
+      :> _ -> _ -> _ -> (_, [> lookup_error]) result Io.t )
 
-  let rec build_dynamic_dir : type p. p directory -> p -> p directory Lwt.t =
+  let rec build_dynamic_dir : type p. p directory -> p -> p directory Io.t =
    fun dir args ->
     match dir with
     | Dynamic (_, builder) ->
         builder args >>= fun dir -> build_dynamic_dir dir args
-    | _ -> Lwt.return dir
+    | _ -> Io.return dir
 
   let rec transparent_resolve :
-      type pr p. pr directory -> (pr, p) path -> p -> p directory option Lwt.t =
+      type pr p. pr directory -> (pr, p) path -> p -> p directory option Io.t =
    fun dir path rargs ->
     match path with
-    | Root -> Lwt.return_some dir
+    | Root -> Io.return_some dir
     | Static (path, name) -> (
         transparent_resolve dir path rargs >>= function
-        | None -> Lwt.return_none
+        | None -> Io.return_none
         | Some dir -> (
             build_dynamic_dir dir rargs >>= function
             | Dynamic (_, _) -> assert false (* should not happen. *)
             | Static {subdirs = Some (Suffixes s); _} ->
-                Lwt.return_some (StringMap.find name s)
-            | Empty -> Lwt.return_none
-            | Static _ -> Lwt.return_none
-            | DynamicTail _ -> Lwt.return_none ) )
+                Io.return_some (StringMap.find name s)
+            | Empty -> Io.return_none
+            | Static _ -> Io.return_none
+            | DynamicTail _ -> Io.return_none ) )
     | Dynamic (ipath, iarg) -> (
         transparent_resolve dir ipath (fst rargs) >>= function
-        | None -> Lwt.return_none
+        | None -> Io.return_none
         | Some dir -> (
             build_dynamic_dir dir (fst rargs) >>= function
             | Dynamic (_, _) -> assert false (* should not happen. *)
             | Static {subdirs = Some (Arg (arg, dir)); _} -> (
                 match Ty.eq iarg.id arg.id with
-                | exception Ty.Not_equal -> Lwt.return_none
-                | Eq -> Lwt.return_some (dir : (_ * _) directory :> p directory)
+                | exception Ty.Not_equal -> Io.return_none
+                | Eq -> Io.return_some (dir : (_ * _) directory :> p directory)
                 )
-            | Empty -> Lwt.return_none
-            | Static _ -> Lwt.return_none
-            | DynamicTail _ -> Lwt.return_none ) )
+            | Empty -> Io.return_none
+            | Static _ -> Io.return_none
+            | DynamicTail _ -> Io.return_none ) )
     | DynamicTail (path, arg) -> (
         transparent_resolve dir path (fst rargs) >>= function
-        | None -> Lwt.return_none
+        | None -> Io.return_none
         | Some dir -> (
             build_dynamic_dir dir (fst rargs) >>= function
             | Dynamic (_, _) -> assert false (* should not happen. *)
             | DynamicTail (iarg, dir) -> (
                 match Ty.eq iarg.id arg.id with
-                | exception Ty.Not_equal -> Lwt.return_none
-                | Eq -> Lwt.return_some (dir : (_ * _) directory :> p directory)
+                | exception Ty.Not_equal -> Io.return_none
+                | Eq -> Io.return_some (dir : (_ * _) directory :> p directory)
                 )
-            | Empty -> Lwt.return_none
-            | Static _ -> Lwt.return_none ) )
+            | Empty -> Io.return_none
+            | Static _ -> Io.return_none ) )
 
   let transparent_lookup :
       type prefix params query input output error.
@@ -499,23 +498,23 @@ module Make (Encoding : ENCODING) = struct
       params ->
       query ->
       input ->
-      (output, error) Answer.t Lwt.t =
+      (output, error) Answer.t Io.t =
    fun dir service params query body ->
     let service = Service.Internal.to_service service in
     transparent_resolve dir service.path params >>= function
-    | None -> Lwt.return (`Not_found None)
+    | None -> Io.return (`Not_found None)
     | Some (Static {services; _}) -> (
         try
           (MethMap.find service.meth services).builder params
           >>= fun (Service {handler; types}) ->
           match Service.Internal.eq types service.types with
-          | exception Service.Internal.Not_equal -> Lwt.return (`Not_found None)
+          | exception Service.Internal.Not_equal -> Io.return (`Not_found None)
           | Service.Internal.Eq ->
               ( handler query body
-                : (_, _) Answer.t Lwt.t
-                :> (output, error) Answer.t Lwt.t )
-        with Not_found -> Lwt.return (`Not_found None) )
-    | Some _ -> Lwt.return (`Not_found None)
+                : (_, _) Answer.t Io.t
+                :> (output, error) Answer.t Io.t )
+        with Not_found -> Io.return (`Not_found None) )
+    | Some _ -> Io.return (`Not_found None)
 
   let transparent_lookup =
     ( transparent_lookup
@@ -524,13 +523,13 @@ module Make (Encoding : ENCODING) = struct
         _ ->
         _ ->
         _ ->
-        (_, _) Answer.t Lwt.t
+        (_, _) Answer.t Io.t
       :> _ ->
          ([< Resto.meth], _, _, _, _, _, _) Service.t ->
          _ ->
          _ ->
          _ ->
-         [> (_, _) Answer.t] Lwt.t )
+         [> (_, _) Answer.t] Io.t )
 
   let rec describe_rpath :
       type a b.
@@ -630,13 +629,13 @@ module Make (Encoding : ENCODING) = struct
       type p q i o e pr.
       pr directory ->
       (_, pr, p, q, i, o, e) Service.t ->
-      (p -> q -> i -> (o, e) Answer.t Lwt.t) ->
+      (p -> q -> i -> (o, e) Answer.t Io.t) ->
       pr directory =
    fun root s handler ->
     let s = Service.Internal.to_service s in
     let register :
         type k.
-        (pr, k) path -> (k -> q -> i -> (o, e) Answer.t Lwt.t) -> pr directory =
+        (pr, k) path -> (k -> q -> i -> (o, e) Answer.t Io.t) -> pr directory =
      fun path handler ->
       let (dir, insert) = insert path root in
       let rs =
@@ -655,7 +654,7 @@ module Make (Encoding : ENCODING) = struct
           }
         in
         let builder key =
-          Lwt.return (Service {types = s.types; handler = handler key})
+          Io.return (Service {types = s.types; handler = handler key})
         in
         {meth = s.meth; description; builder}
       in
@@ -675,11 +674,11 @@ module Make (Encoding : ENCODING) = struct
     ( register
       : _ ->
         (Resto.meth, _, _, _, _, _, _) Service.t ->
-        (_ -> _ -> _ -> (_, _) Answer.t Lwt.t) ->
+        (_ -> _ -> _ -> (_, _) Answer.t Io.t) ->
         _
       :> _ ->
          ([< Resto.meth], _, _, _, _, _, _) Service.t ->
-         (_ -> _ -> _ -> [< (_, _) Answer.t] Lwt.t) ->
+         (_ -> _ -> _ -> [< (_, _) Answer.t] Io.t) ->
          _ )
 
   let register_dynamic_directory :
@@ -687,12 +686,12 @@ module Make (Encoding : ENCODING) = struct
       ?descr:string ->
       pr directory ->
       (pr, a) Path.path ->
-      (a -> a directory Lwt.t) ->
+      (a -> a directory Io.t) ->
       pr directory =
    fun ?descr root path builder ->
     let path = Resto.Internal.to_path path in
     let register :
-        type k. (pr, k) path -> (k -> k directory Lwt.t) -> pr directory =
+        type k. (pr, k) path -> (k -> k directory Io.t) -> pr directory =
      fun path builder ->
       let (dir, insert) = insert path root in
       match dir with
@@ -713,13 +712,13 @@ module Make (Encoding : ENCODING) = struct
     let lookup (args, path) {Description.recurse} () =
       resolve [] root args path >>= function
       | Error `Not_found | Error (`Cannot_parse_path _) ->
-          Lwt.return (`Not_found None)
+          Io.return (`Not_found None)
       | Ok (Dir (dir, arg)) -> (
           describe_directory ~recurse ~arg (Static dir) >>= function
           | Static {services; _} when (not recurse) && MethMap.is_empty services
             ->
-              Lwt.return (`Not_found None)
-          | d -> Lwt.return (`Ok d) )
+              Io.return (`Not_found None)
+          | d -> Io.return (`Ok d) )
     in
     dir := register root service lookup;
     !dir

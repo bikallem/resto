@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+include Resto_intf
+
 module Utils = struct
   let split_path path =
     let l = String.length path in

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(*  Copyright (C) 2016, OCamlPro.                                            *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,49 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Services
-include Resto_directory.Make (Resto_json.Encoding) (Resto_lwt.Io)
+(** [Make(Encoding)] returns a module that provides
+    an instance of [Client.CALL] in its [launch] function.
+    The [Client.CALL] instance is meant to be passed to [Client.Make]
+    to obtain a local, self-serving client: a client that is their own server.
 
-let rec repeat i json = if i <= 0 then [] else json :: repeat (i - 1) json
+    A local, self-serving client is a client that performs RPCs on its own,
+    without the need for a server. It does not open connections, sockets, files
+    nor any such resource. Instead, it serves itself in-memory.
 
-let dir = empty
+    This can be used for testing, for example for mocking a distant server;
+    or in the case where some functionalities can either be provided
+    locally or by a distant server.
 
-let dir =
-  register1 dir repeat_service (fun i () json ->
-      Lwt.return (`Ok (`A (repeat i json))))
+    A local, self-serving client works the same as a server, except that its
+    ACLs cannot be changed after constructing it (as opposed to
+    [Server.Make.set_acl]). *)
+module Make
+    (Encoding : Resto.ENCODING)
+    (Io : Resto.IO)
+    (Log : Resto.LOGGING with type +'a io = 'a Io.t) : sig
+  type t
 
-let dir = register1 dir add_service (fun i () j -> Lwt.return (`Ok (i + j)))
+  val create :
+    ?cors:Cors.t ->
+    ?agent:string ->
+    ?acl:Acl.t ->
+    media_types:Media_type.Make(Encoding).t list ->
+    unit Resto_server.Make(Encoding)(Io)(Log).Directory.directory ->
+    t
 
-let dir =
-  register2 dir alternate_add_service (fun i j () () ->
-      Lwt.return (`Ok (float_of_int i +. j)))
-
-let dir =
-  register dir alternate_add_service' (fun (((), i), j) () () ->
-      Lwt.return (`Ok (i + int_of_float j)))
-
-let dir =
-  register dir alternate_add_service_patch (fun (((), i), j) () _ ->
-      Lwt.return (`Ok (int_of_float (float_of_int i +. j))))
-
-let dir =
-  register dir alternate_add_service_delete (fun (((), _), _) () () ->
-      Lwt.return (`Ok ()))
-
-let dir =
-  register
-    dir
-    dummy_service
-    (fun ((((((((), _a), _b), _c), _d), _e), _f), _g) () () ->
-      Lwt.return (`Ok ()))
-
-let dir =
-  register_dynamic_directory1 dir prefix_dir1 (fun _ ->
-      let prefixed_dir = empty in
-      let prefixed_dir =
-        register2 prefixed_dir minus_service (fun i j () () ->
-            Lwt.return (`Ok (i -. float_of_int j)))
-      in
-      Lwt.return prefixed_dir)
-
-let dir = register_describe_directory_service dir describe_service
+  val call :
+    t ->
+    ?headers:Cohttp.Header.t ->
+    ?body:Io.Body.body ->
+    Cohttp.Code.meth ->
+    Uri.t ->
+    (Cohttp.Response.t * Io.Body.body) Io.t
+end

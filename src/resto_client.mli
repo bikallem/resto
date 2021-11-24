@@ -30,23 +30,29 @@
     optional parameters that resto does not use. See {!OfCohttp} below
     to obtain an exact intance based on [Cohttp_lwt.S.Client]. *)
 module type CALL = sig
+  type +'a io
+
+  type body
+
   val call :
     ?headers:Cohttp.Header.t ->
-    ?body:Cohttp_lwt.Body.t ->
+    ?body:body ->
     Cohttp.Code.meth ->
     Uri.t ->
-    (Cohttp.Response.t * Cohttp_lwt.Body.t) Lwt.t
+    (Cohttp.Response.t * body) io
 end
-
-module OfCohttp (Client : Cohttp_lwt.S.Client) : CALL
 
 (** [Make(Encoding)(Client)] is a module that allows you to make calls to
     various [Resto] (or [EzResto]) services.
+
     The calls are type safe: you must provide the correct parameters to the
     services which are automatically encoded according to [Encoding], the answer
     is automatically decoded according to [Encoding]. The scheduling (waiting on
     answers, etc.) is provided by [Client]. *)
-module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
+module Make
+    (Encoding : Resto.ENCODING)
+    (Io : Resto.IO)
+    (Call : CALL with type +'a io = 'a Io.t with type body = Io.Body.body) : sig
   module Service : module type of struct
     include Resto.MakeService (Encoding)
   end
@@ -57,10 +63,10 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
       https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type *)
   type content_type = string * string
 
-  type raw_content = Cohttp_lwt.Body.t * content_type option
+  type raw_content = Io.Body.body * content_type option
 
   type content =
-    Cohttp_lwt.Body.t * content_type option * Media_type.Make(Encoding).t option
+    Io.Body.body * content_type option * Media_type.Make(Encoding).t option
 
   (** The type for possible results when calling over HTTP. Some results
       correspond to an HTTP return code, other results correspond to internal
@@ -89,22 +95,22 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
   module type LOGGER = sig
     type request
 
-    val log_empty_request : Uri.t -> request Lwt.t
+    val log_empty_request : Uri.t -> request Io.t
 
     val log_request :
       ?media:Media_type.Make(Encoding).t ->
       'a Encoding.t ->
       Uri.t ->
       string ->
-      request Lwt.t
+      request Io.t
 
     val log_response :
       request ->
       ?media:Media_type.Make(Encoding).t ->
       'a Encoding.t ->
       Cohttp.Code.status_code ->
-      string Lwt.t Lazy.t ->
-      unit Lwt.t
+      string Io.t Lazy.t ->
+      unit Io.t
   end
 
   type logger = (module LOGGER)
@@ -122,10 +128,10 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
     [< Resto.meth] ->
     ?headers:(string * string) list ->
     ?accept:Media_type.Make(Encoding).t list ->
-    ?body:Cohttp_lwt.Body.t ->
+    ?body:Io.Body.body ->
     ?media:Media_type.Make(Encoding).t ->
     Uri.t ->
-    (content, content) generic_rest_result Lwt.t
+    (content, content) generic_rest_result Io.t
 
   (** The type for possible results when calling a service. This includes the
       possible HTTP results (see [generic_rest_result] and other
@@ -142,6 +148,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
       query_params input] makes a call to [service] with the parameters
       [path_params], [query_params], and [input]. It returns a result (or an
       error).
+
       The OCaml type system guarantees that the parameters are as expected by
       the service. *)
   val call_service :
@@ -153,7 +160,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
     'p ->
     'q ->
     'i ->
-    (Resto.meth * Uri.t * ('o, 'e) service_result) Lwt.t
+    (Resto.meth * Uri.t * ('o, 'e) service_result) Io.t
 
   (** [call_streamed_service media_types ?logger ?headers ?base service
       ~on_chunk ~on_close path_params query_params input] makes a call to
@@ -161,9 +168,11 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
       The values returned by the service are passed to the [on_chunk] callback,
       and when the server closes the connection the [on_close] callback is
       called.
+
       The function returns a [unit -> unit] function that consumes the remainder
       of the input without side-effects. Call this function when you want to
       discard all the queued-up chunks.
+
       The OCaml type system guarantees that the parameters are as expected by
       the service. *)
   val call_streamed_service :
@@ -177,5 +186,5 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
     'p ->
     'q ->
     'i ->
-    (Resto.meth * Uri.t * (unit -> unit, 'e) service_result) Lwt.t
+    (Resto.meth * Uri.t * (unit -> unit, 'e) service_result) Io.t
 end

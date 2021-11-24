@@ -26,7 +26,7 @@
 open Lwt.Infix
 module Encoding = Resto_json.Encoding
 module Service = Resto.MakeService (Encoding)
-module Directory = Resto_directory.Make (Encoding)
+module Directory = Resto_directory.Make (Encoding) (Resto_lwt.Io)
 module Media_type = Resto_cohttp.Media_type.Make (Encoding)
 
 let json =

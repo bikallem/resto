@@ -1,7 +1,14 @@
 (executable
  (name ezResto_test)
  (modules ezDirectory ezResto_test ezServices)
- (libraries ezresto-directory lwt lwt.unix))
+ (libraries
+  resto
+  ezresto
+  ezresto-directory
+  lwt
+  lwt.unix
+  json-data-encoding
+  uri))
 
 (rule
  (alias runtest_ezresto)
@@ -11,7 +18,7 @@
 (executable
  (name acl_unit_test)
  (modules acl_unit_test)
- (libraries resto-acl)
+ (libraries resto resto-acl)
  (flags
   (:standard -open Resto_acl)))
 
@@ -31,10 +38,14 @@
   cohttp
   cohttp-lwt
   cohttp-lwt-unix
+  conduit-lwt-unix
+  uri
   resto-json
   resto
+  resto-cohttp
   resto-lwt
   resto-acl
+  resto-directory
   resto-cohttp-server
   resto-cohttp-client))
 
@@ -54,8 +65,12 @@
   cohttp
   cohttp-lwt
   cohttp-lwt-unix
-  resto-json
+  conduit-lwt-unix
+  uri
   resto
+  resto-json
+  resto-cohttp
+  resto-directory
   resto-lwt
   resto-acl
   resto-cohttp-server
@@ -70,13 +85,16 @@
  (name resto_test)
  (modules directory resto_test services)
  (libraries
+  resto
   resto-lwt
   resto-directory
   resto-json
   json-data-encoding
   json-data-encoding-bson
+  uri
   lwt
-  lwt.unix))
+  lwt.unix
+  ezresto))
 
 (rule
  (alias runtest_resto)
@@ -87,6 +105,7 @@
  (name self_serving_client_test)
  (modules self_serving_client_test)
  (libraries
+  resto
   resto-lwt
   resto-directory
   resto-json
@@ -95,6 +114,8 @@
   resto-cohttp-client
   resto-cohttp-server
   json-data-encoding
+  cohttp
+  uri
   ezjsonm
   lwt
   lwt.unix))

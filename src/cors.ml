@@ -74,4 +74,4 @@ let check_host headers cors =
   | Some host -> (
       match find_matching_origin cors.allowed_origins host with
       | None -> false
-      | Some _ -> true )
+      | Some _ -> true)

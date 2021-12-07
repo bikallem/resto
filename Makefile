@@ -1,8 +1,6 @@
-
 all:
 	dune build
 
-.PHONY: test
 test:
 	dune runtest
 
@@ -13,5 +11,6 @@ clean:
 	dune clean
 
 fmt:
-	ocamlformat --inplace src/*.ml src/*.mli
-	ocamlformat --inplace test/*.ml
+	dune b @fmt --auto-promote
+
+.PHONY: all test doc-html clean fmt

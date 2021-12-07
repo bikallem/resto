@@ -409,27 +409,27 @@ module Query = struct
             let Eq = Ty.eq field.ty.id field'.ty.id in
             let v = match v with None -> field.default | Some v -> v in
             rebuild map fs (f v)
-        | Parsed _ -> assert false )
+        | Parsed _ -> assert false)
     | F1 (Opt field, fs) -> (
         match StringMap.find field.name map with
         | Parsed (Opt field', v) ->
             let Eq = Ty.eq field.ty.id field'.ty.id in
             let v = match v with None -> None | Some v -> v in
             rebuild map fs (f v)
-        | Parsed _ -> assert false )
+        | Parsed _ -> assert false)
     | F1 (Flag field, fs) -> (
         match StringMap.find field.name map with
         | Parsed (Flag _, v) ->
             let v = match v with None -> false | Some v -> v in
             rebuild map fs (f v)
-        | Parsed _ -> assert false )
+        | Parsed _ -> assert false)
     | F1 (Multi field, fs) -> (
         match StringMap.find field.name map with
         | Parsed (Multi field', v) ->
             let Eq = Ty.eq field.ty.id field'.ty.id in
             let v = match v with None -> [] | Some v -> v in
             rebuild map fs (f v)
-        | Parsed _ -> assert false )
+        | Parsed _ -> assert false)
 
   exception Invalid of string
 
@@ -464,8 +464,7 @@ module Query = struct
                       name
                       value
                       error
-                | Ok v -> StringMap.add name (Parsed (Single f, Some v)) fields
-                )
+                | Ok v -> StringMap.add name (Parsed (Single f, Some v)) fields)
             | Parsed (Opt f, None) -> (
                 match f.ty.destruct value with
                 | Error error ->
@@ -475,7 +474,7 @@ module Query = struct
                       value
                       error
                 | Ok v ->
-                    StringMap.add name (Parsed (Opt f, Some (Some v))) fields )
+                    StringMap.add name (Parsed (Opt f, Some (Some v))) fields)
             | Parsed (Flag f, None) -> (
                 match bool_of_string value with
                 | Ok v -> StringMap.add name (Parsed (Flag f, Some v)) fields
@@ -484,7 +483,7 @@ module Query = struct
                       "Failed to parse argument '%s' (%S): %s"
                       name
                       value
-                      error )
+                      error)
             | Parsed (Multi f, previous) -> (
                 match f.ty.destruct value with
                 | Error error ->
@@ -497,7 +496,7 @@ module Query = struct
                     let v =
                       match previous with None -> [v] | Some l -> v :: l
                     in
-                    StringMap.add name (Parsed (Multi f, Some v)) fields ))
+                    StringMap.add name (Parsed (Multi f, Some v)) fields))
           fields
           query
       in
@@ -775,11 +774,11 @@ module MakeService (Encoding : ENCODING) = struct
       | F1 (Opt {name; ty; get; _}, fields) -> (
           match get q with
           | None -> loop fields
-          | Some v -> (name, ty.construct v) :: loop fields )
+          | Some v -> (name, ty.construct v) :: loop fields)
       | F1 (Flag {name; get; _}, fields) -> (
           match get q with
           | false -> loop fields
-          | true -> (name, "true") :: loop fields )
+          | true -> (name, "true") :: loop fields)
       | F1 (Multi {name; ty; get; _}, fields) -> (
           match get q with
           | [] -> loop fields
@@ -787,7 +786,7 @@ module MakeService (Encoding : ENCODING) = struct
               List.fold_right
                 (fun v acc -> (name, ty.construct v) :: acc)
                 l
-                (loop fields) )
+                (loop fields))
     in
     loop fields
 
@@ -803,12 +802,12 @@ module MakeService (Encoding : ENCODING) = struct
     {meth = s.meth; uri; input = s.types.input}
 
   let forge_partial_request =
-    ( forge_partial_request
+    (forge_partial_request
       : (meth, _, _, _, _, _, _) service -> _
-      :> ([< meth], _, _, _, _, _, _) service -> _ )
+      :> ([< meth], _, _, _, _, _, _) service -> _)
 
   let forge_request =
-    ( forge_partial_request
+    (forge_partial_request
       : (meth, _, _, _, _, _, _) service -> _
-      :> ([< meth], unit, _, _, _, _, _) service -> _ )
+      :> ([< meth], unit, _, _, _, _, _) service -> _)
 end

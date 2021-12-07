@@ -14,10 +14,11 @@ depends: [
   "ezjsonm" {with-test}
   "lwt" {with-test}
   "base-unix" {with-test}
-  "ocamlformat" {= "0.19.0" & dev}
   "cohttp" {>= "4.0.0"}
   "cohttp-lwt" {>= "4.0.0" & with-test}
   "cohttp-lwt-unix" {>= "4.0.0" & with-test}
+  "result" {>= "1.5"}
+  "conduit-lwt-unix" {>= "4.0.2" & with-test}
 ]
 build: ["dune" "build" "-p" name "-j" jobs]
 dev-repo: "git+https://gitlab.com/nomadic-labs/resto"

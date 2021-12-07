@@ -138,17 +138,17 @@ module Faked = Test (struct
     lookup dir () meth path >>= function
     | Ok (Service s) -> (
         let query = Resto.Query.parse s.types.query query in
-        ( match s.types.input with
+        (match s.types.input with
         | Service.No_input -> s.handler query ()
         | Service.Input input ->
-            s.handler query @@ Json_encoding.destruct input json )
+            s.handler query @@ Json_encoding.destruct input json)
         >>= function
         | `Ok res ->
             let json = Json_encoding.construct s.types.output res in
             Lwt.return
               (`Ok
                 (Json_encoding.destruct (Service.output_encoding service) json))
-        | _ -> failwith "Unexpected lwt result (1)" )
+        | _ -> failwith "Unexpected lwt result (1)")
     | _ -> failwith "Unexpected lwt result (2)"
 end)
 

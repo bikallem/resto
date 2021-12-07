@@ -166,21 +166,21 @@ let main () =
   Server.set_acl server
   @@ Resto_acl.Acl.Allow_all
        {except = [{meth = Any; path = Exact [Literal "foo"; Wildcard]}]};
-  ( match Lwt_unix.fork () with
+  (match Lwt_unix.fork () with
   | 0 ->
       Lwt_unix.sleep 1.0 >>= fun () ->
       child (`Unauthorized None) (`Unauthorized None) (`Ok (Some ()))
-  | pid -> parent pid )
+  | pid -> parent pid)
   >>= fun () ->
   (* second test *)
   Server.set_acl server
   @@ Resto_acl.Acl.Deny_all
        {except = [{meth = Any; path = FollowedByAnySuffix [Literal "foo"]}]};
-  ( match Lwt_unix.fork () with
+  (match Lwt_unix.fork () with
   | 0 ->
       Lwt_unix.sleep 1.0 >>= fun () ->
       child (`Ok (Some ())) (`Ok (Some ())) (`Unauthorized None)
-  | pid -> parent pid )
+  | pid -> parent pid)
   >>= fun () ->
   (* third test *)
   Server.set_acl server
@@ -192,11 +192,11 @@ let main () =
              {meth = Exact `DELETE; path = FollowedByAnySuffix []};
            ];
        };
-  ( match Lwt_unix.fork () with
+  (match Lwt_unix.fork () with
   | 0 ->
       Lwt_unix.sleep 1.0 >>= fun () ->
       child (`Ok (Some ())) (`Ok (Some ())) (`Unauthorized None)
-  | pid -> parent pid )
+  | pid -> parent pid)
   >>= fun () ->
   (* fourth test *)
   Server.set_acl server
@@ -218,11 +218,11 @@ let main () =
              };
            ];
        };
-  ( match Lwt_unix.fork () with
+  (match Lwt_unix.fork () with
   | 0 ->
       Lwt_unix.sleep 1.0 >>= fun () ->
       child (`Unauthorized None) (`Unauthorized None) (`Ok (Some ()))
-  | pid -> parent pid )
+  | pid -> parent pid)
   >>= fun () ->
   (* end of tests *)
   Lwt.return ()

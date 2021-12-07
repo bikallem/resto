@@ -101,7 +101,7 @@ struct
   type logger = (module LOGGER)
 
   let null_logger =
-    ( module struct
+    (module struct
       type request = unit
 
       let log_empty_request _ = Io.return_unit
@@ -109,10 +109,10 @@ struct
       let log_request ?media:_ _ _ _ = Io.return_unit
 
       let log_response _ ?media:_ _ _ _ = Io.return_unit
-    end : LOGGER )
+    end : LOGGER)
 
   let timings_logger ~gettimeofday ppf =
-    ( module struct
+    (module struct
       type request = string * float
 
       let log_empty_request uri =
@@ -125,7 +125,7 @@ struct
         let time = gettimeofday () -. tzero in
         Format.fprintf ppf "Request to %s succeeded in %gs@." uri time;
         Io.return_unit
-    end : LOGGER )
+    end : LOGGER)
 
   let faked_media =
     {
@@ -140,7 +140,7 @@ struct
     }
 
   let full_logger ppf =
-    ( module struct
+    (module struct
       let cpt = ref 0
 
       type request = int * string
@@ -175,17 +175,21 @@ struct
           (media.pp enc)
           body;
         Io.return_unit
-    end : LOGGER )
+    end : LOGGER)
 
   let find_media received media_types =
     match received with
     | Some received -> Media_type.find_media received media_types
-    | None -> ( match media_types with [] -> None | m :: _ -> Some m )
+    | None -> ( match media_types with [] -> None | m :: _ -> Some m)
 
   type log = {
     log:
-      'a. ?media:Media_type.t -> 'a Encoding.t -> Cohttp.Code.status_code ->
-      string Io.t Lazy.t -> unit Io.t;
+      'a.
+      ?media:Media_type.t ->
+      'a Encoding.t ->
+      Cohttp.Code.status_code ->
+      string Io.t Lazy.t ->
+      unit Io.t;
   }
 
   let generic_call meth ?(headers = []) ?accept ?body ?media uri :
@@ -240,7 +244,7 @@ struct
           | Some s -> (
               match Resto.Utils.split_path s with
               | [x; y] -> Some (x, y)
-              | _ -> None )
+              | _ -> None)
           (* ignored invalid *)
         in
         let media =
@@ -306,7 +310,7 @@ struct
           match media.Media_type.destruct error body with
           | Ok body -> Io.return (f (Some body))
           | Error msg ->
-              Io.return (`Unexpected_error_content ((body, media), msg)) )
+              Io.return (`Unexpected_error_content ((body, media), msg)))
 
   let prepare (type i) media_types ?(logger = null_logger) ?base
       (service : (_, _, _, _, i, _, _) Service.t) params query body =
@@ -319,14 +323,14 @@ struct
     let {Service.meth; uri; input} =
       Service.forge_request ?base service params query
     in
-    ( match input with
+    (match input with
     | Service.No_input ->
         Logger.log_empty_request uri >>= fun log_request ->
         Io.return (None, None, log_request)
     | Service.Input input ->
         let body = media.Media_type.construct input body in
         Logger.log_request ~media input uri body >>= fun log_request ->
-        Io.return (Some (Io.Body.of_string body), Some media, log_request) )
+        Io.return (Some (Io.Body.of_string body), Some media, log_request))
     >>= fun (body, media, log_request) ->
     let log = {log = (fun ?media -> Logger.log_response log_request ?media)} in
     Io.return (log, meth, uri, body, media)
@@ -350,7 +354,7 @@ struct
              match media.destruct output body with
              | Ok body -> Io.return (`Ok (Some body))
              | Error msg -> Io.return (`Unexpected_content ((body, media), msg))
-             ) )
+             ))
      | `Conflict body ->
          handle_error log service body `Conflict (fun v -> `Conflict v)
      | `Error body ->
@@ -405,7 +409,7 @@ struct
                            Buffer.reset buffer;
                            on_chunk body;
                            Io.Stream.get stream >>= loop
-                       | Error _msg -> Io.Stream.get stream >>= loop )
+                       | Error _msg -> Io.Stream.get stream >>= loop)
                  in
                  ignore (loop (Some chunk) : unit Io.t);
                  Io.return
@@ -413,9 +417,9 @@ struct
                      (Some
                         (fun () ->
                           ignore
-                            ( Io.Stream.junk_while (fun _ -> true) stream
-                              : unit Io.t );
-                          ()))) ) )
+                            (Io.Stream.junk_while (fun _ -> true) stream
+                              : unit Io.t);
+                          ())))))
      | `Conflict body ->
          handle_error log service body `Conflict (fun v -> `Conflict v)
      | `Error body ->

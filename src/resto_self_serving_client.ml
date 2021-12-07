@@ -53,11 +53,11 @@ struct
     >>? fun input_media_type ->
     Server.Media.output_content_media_type server.medias ~headers
     >>? fun (_output_content_type, output_media_type) ->
-    ( match
-        Resto.Query.parse
-          s.types.query
-          (List.map (fun (k, l) -> (k, String.concat "," l)) (Uri.query uri))
-      with
+    (match
+       Resto.Query.parse
+         s.types.query
+         (List.map (fun (k, l) -> (k, String.concat "," l)) (Uri.query uri))
+     with
     | exception Resto.Query.Invalid s -> Io.return_error (`Cannot_parse_query s)
     | query -> (
         if not @@ Acl.allowed server.acl ~meth ~path then
@@ -70,7 +70,7 @@ struct
               >>= fun body ->
               match input_media_type.destruct input body with
               | Error s -> Io.return_error (`Cannot_parse_body s)
-              | Ok body -> s.handler query body >>= Io.return_ok ) ) )
+              | Ok body -> s.handler query body >>= Io.return_ok)))
     >>= function
     | Ok answer -> (
         let output = output_media_type.construct s.types.output in
@@ -100,8 +100,7 @@ struct
         | ( `Unauthorized _ | `Forbidden _ | `Gone _ | `Not_found _
           | `Conflict _ | `Error _ ) as a ->
             Io.return_ok
-            @@ Server.Handlers.handle_rpc_answer_error "local" ~headers error a
-        )
+            @@ Server.Handlers.handle_rpc_answer_error "local" ~headers error a)
     | Error err ->
         Io.return_ok
         @@ Server.Handlers.handle_error
@@ -112,13 +111,13 @@ struct
   let call (server : t) ?headers ?body (meth : Cohttp.Code.meth) uri =
     let path = uri |> Uri.path |> Resto.Utils.decode_split_path in
     let headers = Option.value headers ~default:(Cohttp.Header.init ()) in
-    ( match meth with
+    (match meth with
     | #Resto.meth when Server.Handlers.invalid_cors server.cors headers ->
         Io.return_ok (Server.Handlers.invalid_cors_response server.agent)
     | #Resto.meth as meth -> call server ~headers ?body meth uri path
     | `OPTIONS ->
         Server.Handlers.handle_options server.root server.cors headers path
-    | _ -> Io.return_error `Not_implemented )
+    | _ -> Io.return_error `Not_implemented)
     >>= function
     | Ok a -> Io.return a
     | Error err ->

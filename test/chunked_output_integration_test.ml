@@ -200,11 +200,11 @@ let test_one_size chunk_size =
       | 0 ->
           Lwt_unix.sleep 2.0 (* leave time for the server to start *)
           >>= fun () -> child ()
-      | pid -> parent pid chunk_size )
+      | pid -> parent pid chunk_size)
   | pid -> (
       Lwt_unix.waitpid [] pid >>= function
       | (_, WEXITED 0) -> Lwt.return ()
-      | _ -> assert false )
+      | _ -> assert false)
 
 let main () =
   (* test smaller and smaller, more and more numerous chunks *)

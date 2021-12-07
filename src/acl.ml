@@ -86,7 +86,7 @@ let add_chunk (matcher : path_matcher) (chunk : string) =
               | _ -> ())
             literal;
           let decoded_literal = Uri.pct_decode literal in
-          Exact (Literal decoded_literal :: f) )
+          Exact (Literal decoded_literal :: f))
 
 let parse_path s offset =
   String.sub s offset (String.length s - offset)

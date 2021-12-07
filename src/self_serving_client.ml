@@ -37,7 +37,7 @@ struct
 
   let launch ?cors ?agent ?acl ~media_types dir =
     let t = Call.create ?cors ?agent ?acl ~media_types dir in
-    ( module struct
+    (module struct
       let call = Call.call t
-    end : Client.CALL )
+    end : Client.CALL)
 end

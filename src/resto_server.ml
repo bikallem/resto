@@ -60,8 +60,8 @@ struct
               | [x; y] -> (
                   match Media_type.find_media (x, y) medias.media_types with
                   | None -> Error (`Unsupported_media_type content_type)
-                  | Some media_type -> Ok media_type )
-              | _ -> Error (`Unsupported_media_type content_type) ) )
+                  | Some media_type -> Ok media_type)
+              | _ -> Error (`Unsupported_media_type content_type)))
 
     let output_content_media_type ?headers medias =
       match headers with
@@ -76,7 +76,7 @@ struct
                   (Some accepted)
               with
               | None -> Error `Not_acceptable
-              | Some media_type -> Ok media_type ) )
+              | Some media_type -> Ok media_type))
   end
 
   module Agent = struct
@@ -219,8 +219,8 @@ struct
 
     let handle_options root cors headers path =
       let origin_header = Header.get headers "origin" in
-      ( if (* Default OPTIONS handler for CORS preflight *)
-           origin_header = None
+      (if (* Default OPTIONS handler for CORS preflight *)
+          origin_header = None
       then Directory.allowed_methods root () path
       else
         match Header.get headers "Access-Control-Request-Method" with
@@ -230,7 +230,7 @@ struct
             | #Resto.meth as meth ->
                 Directory.lookup root () meth path >>=? fun _handler ->
                 Io.return_ok [meth]
-            | _ -> Io.return_error `Not_found ) )
+            | _ -> Io.return_error `Not_found))
       >>=? fun cors_allowed_meths ->
       let headers = Header.init () in
       let headers =
@@ -298,7 +298,7 @@ struct
     Log.lwt_debug "(%s) request body: %s" con_string body >>= fun () ->
     let path = Uri.path uri in
     let path = Resto.Utils.decode_split_path path in
-    ( match Request.meth req with
+    (match Request.meth req with
     | #Resto.meth when Handlers.invalid_cors server.cors req_headers ->
         Io.return_ok_response @@ Handlers.invalid_cors_response server.agent
     | #Resto.meth as meth -> (
@@ -313,16 +313,14 @@ struct
         >>= fun () ->
         Media.output_content_media_type ~headers:req_headers server.medias
         >>? fun (output_content_type, output_media_type) ->
-        ( match
-            Resto.Query.parse
-              s.types.query
-              (List.map
-                 (fun (k, l) -> (k, String.concat "," l))
-                 (Uri.query uri))
-          with
+        (match
+           Resto.Query.parse
+             s.types.query
+             (List.map (fun (k, l) -> (k, String.concat "," l)) (Uri.query uri))
+         with
         | exception Resto.Query.Invalid s ->
             Io.return_error (`Cannot_parse_query s)
-        | query -> Io.return_ok query )
+        | query -> Io.return_ok query)
         >>=? fun query ->
         Log.lwt_debug
           "(%s) ouput media type %s"
@@ -337,15 +335,15 @@ struct
             server.cors
             (Header.get req_headers "origin")
         in
-        ( if not @@ Acl.allowed server.acl ~meth ~path then
-          Io.return_ok (`Unauthorized None)
+        (if not @@ Acl.allowed server.acl ~meth ~path then
+         Io.return_ok (`Unauthorized None)
         else
           match s.types.input with
           | Service.No_input -> s.handler query () >>= Io.return_ok
           | Service.Input input -> (
               match input_media_type.destruct input body with
               | Error s -> Io.return_error (`Cannot_parse_body s)
-              | Ok body -> s.handler query body >>= Io.return_ok ) )
+              | Ok body -> s.handler query body >>= Io.return_ok))
         >>=? fun answer ->
         match answer with
         | (`Ok _ | `No_content | `Created _) as a ->
@@ -387,7 +385,7 @@ struct
             let response =
               Handlers.handle_rpc_answer_error con_string ~headers error a
             in
-            Io.return_ok_response response )
+            Io.return_ok_response response)
     | `HEAD ->
         (* TODO ??? *)
         Io.return_error `Not_implemented
@@ -397,8 +395,8 @@ struct
         Log.lwt_log_info "(%s) RPC preflight" con_string >>= fun () ->
         match res with
         | Ok res -> Io.return_ok_response res
-        | Error _ as e -> Io.return e )
-    | _ -> Io.return_error `Not_implemented )
+        | Error _ as e -> Io.return e)
+    | _ -> Io.return_error `Not_implemented)
     >>= function
     | Ok answer -> Io.return answer
     | Error err ->

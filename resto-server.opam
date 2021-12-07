@@ -19,6 +19,8 @@ depends: [
   "json-data-encoding" {>= "0.9.1" & with-test}
   "json-data-encoding-bson" {>= "0.9.1" & with-test}
   "lwt" {>= "5.5.0" & with-test}
+  "uri" {>= "4.2.0"}
+  "conduit-lwt-unix" {>= "4.0.2" & with-test}
 ]
 build: ["dune" "build" "-p" name "-j" jobs]
 dev-repo: "git+https://gitlab.com/nomadic-labs/resto"

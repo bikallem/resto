@@ -2,26 +2,41 @@
  (name resto)
  (public_name resto)
  (modules resto resto_intf)
- (libraries uri cohttp))
+ (libraries uri cohttp result))
 
 (library
  (name resto_lwt)
  (public_name resto-lwt)
  (modules resto_lwt)
- (libraries resto lwt lwt.unix cohttp-lwt cohttp-lwt-unix conduit-lwt-unix))
+ (libraries
+  resto
+  lwt
+  lwt.unix
+  cohttp-lwt
+  cohttp-lwt-unix
+  conduit-lwt-unix
+  cohttp
+  result))
 
 (library
  (name ezresto)
  (public_name ezresto)
  (modules ezResto)
- (libraries resto-json resto uri)
+ (libraries resto-json resto uri json-data-encoding)
  (wrapped false))
 
 (library
  (name ezresto_directory)
  (public_name ezresto-directory)
  (modules ezResto_directory)
- (libraries ezresto resto-directory resto resto-lwt lwt)
+ (libraries
+  ezresto
+  resto-directory
+  resto
+  resto-lwt
+  lwt
+  json-data-encoding
+  resto-json)
  (wrapped false))
 
 (library
@@ -33,7 +48,7 @@
 (library
  (name resto_server)
  (public_name resto-server)
- (libraries resto resto-acl resto-cohttp resto-directory cohttp)
+ (libraries resto resto-acl resto-cohttp resto-directory cohttp uri)
  (modules resto_server)
  (flags
   (:standard -open Resto_cohttp -open Resto_acl)))
@@ -48,9 +63,13 @@
   resto-acl
   resto-cohttp
   resto-server
+  cohttp
+  cohttp-lwt
   cohttp-lwt-unix
   conduit-lwt-unix
-  lwt)
+  result
+  lwt
+  lwt.unix)
  (modules server)
  (flags
   (:standard -open Resto_cohttp -open Resto_acl)))
@@ -79,6 +98,7 @@
   resto-cohttp
   resto-client
   resto-cohttp-server
+  cohttp
   cohttp-lwt
   uri
   lwt)
@@ -96,6 +116,7 @@
   resto-client
   resto-server
   resto-directory
+  cohttp
   uri)
  (modules resto_self_serving_client)
  (flags
@@ -110,9 +131,11 @@
   resto-directory
   resto-acl
   resto-cohttp
+  resto-server
   resto-cohttp-client
   resto-cohttp-server
   resto-self-serving-client
+  cohttp-lwt
   uri
   lwt)
  (modules self_serving_client)
